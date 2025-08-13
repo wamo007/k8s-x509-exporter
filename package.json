@@ -1,0 +1,22 @@
+{
+  "name": "k8s-x509-exporter",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon index",
+    "start": "node index"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@kubernetes/client-node": "^1.3.0",
+    "express": "^5.1.0",
+    "node-forge": "^1.3.1",
+    "prom-client": "^15.1.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
