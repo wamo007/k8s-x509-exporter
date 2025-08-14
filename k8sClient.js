@@ -36,7 +36,7 @@ async function getTLSSecrets() {
   }
 
   try {
-    const { body } = await k8sApi.listSecretForAllNamespaces();
+    const body = await k8sApi.listSecretForAllNamespaces();
     const items = body?.items ?? [];
     return items.filter(s => s?.type === 'kubernetes.io/tls' && s?.data?.['tls.crt']);
   } catch (err) {
