@@ -1,44 +1,50 @@
+// k8sClient.js
 const k8s = require('@kubernetes/client-node');
+const fs = require('fs');
+const path = process.env.KUBECONFIG || `/root/.kube/config`;
 
 function loadKubeConfig() {
-  const path = process.env.KUBECONFIG || `/root/.kube/config`;
+  
   const kc = new k8s.KubeConfig();
 
-  // EITHER load specific file…
-  kc.loadFromFile(path);
-  // …OR use defaults:
-  // kc.loadFromDefault();
+  if (fs.existsSync(path)) {
+    kc.loadFromFile(path)
 
-  // If the cluster URL is http://, the client requires skipTLSVerify=true.
-  const cluster = kc.getCurrentCluster();
-  if (!cluster) {
-    throw new Error('No current context/cluster is set in kubeconfig');
+    const cluster = kc.getCurrentCluster();
+    if (!cluster) {
+      throw new Error('No current context/cluster is set in kubeconfig');
+    }
+
+    if (cluster.server.startsWith('http://') && !cluster.skipTLSVerify) {
+      cluster.skipTLSVerify = true;
+    }
+
+    return kc;
+  } else {
+    console.warn('Config file not found')
+    return null;
   }
-
-  if (cluster.server.startsWith('http://') && !cluster.skipTLSVerify) {
-    // Dev-only: explicitly allow insecure HTTP to avoid the error.
-    // Prefer fixing kubeconfig to use HTTPS.
-    cluster.skipTLSVerify = true;
-  }
-
-  return kc;
 }
 
 const kc = loadKubeConfig();
-const k8sApi = kc.makeApiClient(k8s.CoreV1Api);
+const k8sApi = kc ? kc.makeApiClient(k8s.CoreV1Api) : null;
 
 async function getTLSSecrets() {
-try {
-    const body = await k8sApi.listSecretForAllNamespaces();
+  if (!k8sApi) {
+    console.warn('[k8sClient] Skipping TLS secrets retrieval – no kubeconfig loaded.');
+    return [];
+  }
+
+  try {
+    const { body } = await k8sApi.listSecretForAllNamespaces();
     const items = body?.items ?? [];
     return items.filter(s => s?.type === 'kubernetes.io/tls' && s?.data?.['tls.crt']);
   } catch (err) {
-    // Surface useful details
-    if (err.response) {
-      console.error('K8s API error:', err.response.statusCode, err.response.statusMessage);
-      try { console.error('Details:', err.response.body); } catch {}
+    if (err?.response) {
+      console.warn('[k8sClient] K8s API error:', err.response.statusCode, err.response.statusMessage);
+      try { console.warn('[k8sClient] Details:', err.response.body); } catch {}
     } else {
-      console.error('Unexpected error:', err);
+      console.warn('[k8sClient] Unexpected error:', err?.message || err);
     }
     throw err;
   }
